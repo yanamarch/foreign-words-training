@@ -4,14 +4,15 @@
 const totalWordElement = document.getElementById('total-word');
 const currentWordElement = document.getElementById('current-word');
 const wordsProgressElement = document.getElementById('words-progress');
-const shuffleButton = document.getElementById('shuffle-words');
-const backButton = document.getElementById('back');
-const nextButton = document.getElementById('next');
-const examButton = document.getElementById('exam');
+const studyCards = document.querySelector('.study-cards');
 const flipCards = document.getElementsByClassName('flip-card');
 const cardFrontElement = document.getElementById('card-front').querySelector('h1');
 const cardBackElement = document.getElementById('card-back').querySelector('h1');
 const cardBackExampleElement = document.getElementById('card-back').querySelector('span');
+const shuffleButton = document.getElementById('shuffle-words');
+const backButton = document.getElementById('back');
+const nextButton = document.getElementById('next');
+const examButton = document.getElementById('exam');
 const examCards = document.getElementById('exam-cards');
 const examProgressElement = document.getElementById('exam-progress');
 const correctPercentElement = document.getElementById('correct-percent');
@@ -19,7 +20,7 @@ const timerElement = document.getElementById('timer');
 const motivationElement = document.querySelector('.motivation');
 const resultsModal = document.querySelector('.results-modal');
 
-let currentWordIndex = 1;
+let currentWordIndex = 0;
 let correctWords = 0;
 let totalWords = 5;
 let timer = 0;
@@ -27,11 +28,11 @@ let isExamMode = false;
 
 //Список слов и их перевод
 const words = [
-    { foreignWord: "Hello", translation: "Привет", example: "Hello, Masha ?" },
-    { foreignWord: "Dog", translation: "Собака", example: "I love my dog" },
-    { foreignWord: "Mother", translation: "Мама", example: "My mother is a doctor" },
-    { foreignWord: "Summer", translation: "Лето", example: "My favorite season is summer" },
-    { foreignWord: "Blue", translation: "Синий", example: "My favorite color is blue" },
+    { foreignWord: "Hello", translation: "Привет", example: "Hello, Masha!" },
+    { foreignWord: "Dog", translation: "Собака", example: "I love my dog." },
+    { foreignWord: "Mother", translation: "Мама", example: "My mother is a doctor." },
+    { foreignWord: "Summer", translation: "Лето", example: "My favorite season is summer." },
+    { foreignWord: "Blue", translation: "Синий", example: "My favorite color is blue." },
 ];
 
 //Обработчик клика по карточке для переворота
@@ -65,19 +66,17 @@ function updateProgress() {
 function shuffleWords() {
     words.sort(() => Math.random() - 0.5);
     updateCard(0);
-    currentWordIndex = 1;
-    updateProgress();
+    currentWordIndex = 0;
 }
 
 //Функция для переключения между режимами
 function switchMode() {
     isExamMode = !isExamMode;
-    document.getElementById('study-mode').classList.toggle('hidden');
-    document.getElementById('exam-mode').classList.toggle('hidden');
+    studyCards.classList.toggle('hidden');
+    examCards.classList.toggle('hidden');
     examCards.innerHTML = '';
     if (isExamMode) {
         shuffleWords();
-        startExamTimer();
     }
 }
 
@@ -86,7 +85,7 @@ shuffleButton.addEventListener('click', shuffleWords);
 backButton.addEventListener('click', () => {
     if (currentWordIndex > 1) {
         currentWordIndex--;
-        updateCard(currentWordIndex - 1);
+        updateCard(currentWordIndex);
         updateProgress();
         stopSlider();
     }
@@ -101,78 +100,91 @@ nextButton.addEventListener('click', () => {
 });
 const stopSlider = () => {
     backButton.disabled = currentWordIndex === 0;
-    nextButton.disabled = currentWordIndex === flipCards.length - 1;
+    nextButton.disabled = currentWordIndex === words.length;
 };
-examButton.addEventListener('click', switchMode);
 
+//Режим тестирования
 
-//Обработчик события для кнопки "Тестирование" ???
+let dictionary = {};
+
+function fillDictionary() {
+    words.forEach((item) => {
+        dictionary[item.foreignWord] = item.translation;
+        dictionary[item.translation] = item.foreignWord;
+    });
+}
+
+fillDictionary();
+
+//Обработчик события для кнопки "Тестирование"
 examButton.addEventListener('click', function() {
+
+    switchMode();
     isExamMode = true;
 
-    // Отображение карточек в случайном порядке
-    const shuffledWords = words.sort(() => Math.random() - 0.5);
+    //Отображение карточек в случайном порядке
     examCards.innerHTML = '';
+
+    const allWords = [];
+    words.forEach(word => {
+        allWords.push(word.foreignWord);
+        allWords.push(word.translation);
+    });
+
+    console.log(allWords, 'allWords');
+
+    const shuffledWords = allWords.sort(() => Math.random() - 0.5);
+
+    let selectedCard;
 
     shuffledWords.forEach(word => {
         const card = document.createElement('div');
         card.classList.add('exam-card');
-        card.innerHTML = `
-            <div class="foreign-word">${word.foreignWord}</div>
-            <div class="translation">${word.translation}</div>`;
+        card.classList.add('card');
 
-        card.addEventListener('click', function() {
-            this.classList.add('correct');
-            const selectedCards = document.querySelectorAll('.exam-card.correct');
+        card.textContent = word;
 
-            if (selectedCards.length === 2) {
-                const [firstCard, secondCard] = selectedCards;
-
-                if (firstCard.querySelector('.foreign-word').innerText === secondCard.querySelector('.translation').innerText) {
-                    setTimeout(() => {
-                        firstCard.classList.add('fade-out');
-                        secondCard.classList.add('fade-out');
-                        examCards.removeChild(firstCard);
-                        examCards.removeChild(secondCard);
-                    }, 500);
-                } else {
-                    setTimeout(() => {
-                        secondCard.classList.add('wrong');
-                        setTimeout(() => {
-                            secondCard.classList.remove('wrong');
-                        }, 500);
-                    }, 500);
-                }
-
-                selectedCards.forEach(card => card.classList.remove('correct'));
-            }
-        });
         examCards.appendChild(card);
+
+        card.addEventListener('click', function(e) {
+            if (!selectedCard) {
+                selectedCard = e.target;
+                selectedCard.classList.add('correct');
+                return;
+            }
+
+            if (dictionary[this.textContent] === selectedCard.textContent) {
+                this.classList.add('correct');
+                selectedCard.classList.add('fade-out');
+                this.classList.add('fade-out');
+                setTimeout(checkEndGame, 500);
+
+            } else {
+                this.classList.add('wrong');
+                const correctCards = document.querySelectorAll(".correct");
+                const inCorrectCards = document.querySelectorAll(".wrong");
+
+                setTimeout(() => {
+                    [...correctCards, ...inCorrectCards].forEach((card) => {
+                        if (!card.classList.contains("fade-out")) {
+                            card.className = "card";
+                        }
+                    });
+                }, 500);
+            }
+            const fadeOutCard = document.querySelectorAll(".fade-out");
+            fadeOutCard.forEach(card => {
+                card.style.pointerEvents = "none";
+            })
+            selectedCard = null;
+        })
+
     });
-    alert('Поздравляем! Тестирование успешно завершено!');
 });
 
-//Функция Таймера
-function startExamTimer() {
-    const startTime = new Date().getTime();
-    setInterval(() => {
-        const currentTime = new Date().getTime();
-        timer = (currentTime - startTime) / 1000;
-        const minutes = Math.floor(timer / 60);
-        const seconds = Math.floor(timer % 60);
-        timerElement.textContent = `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-    }, 1000);
-}
-
-//Функция для окна с результатами
-function showResultsModal() {
-    resultsModal.classList.remove('hidden');
-    resultsModal.querySelector('.time').textContent = timerElement.textContent;
-    const wordStatsTemplate = document.getElementById('word-stats');
-    words.forEach((word, index) => {
-        const wordStats = wordStatsTemplate.content.cloneNode(true);
-        wordStats.querySelector('.word span').textContent = word.word;
-        wordStats.querySelector('.attempts span').textContent = index % 2 === 0 ? '1' : '0';
-        resultsModal.querySelector('.results-content').appendChild(wordStats);
-    });
+function checkEndGame() {
+    const fadeOutCard = document.querySelectorAll(".fade-out");
+    if (fadeOutCard.length === Object.keys(dictionary).length) {
+        alert('Поздравляю! Вы успешно прошли тестирование')
+    }
 }
